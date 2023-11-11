@@ -157,3 +157,210 @@ GROUP BY vendor_group;
 - Handling vendor details in a large dataset
 
 
+# SQL Notes - Section 3
+
+## 10. Use JOINs and UNIONs to answer the following questions:
+
+### 10.1 Which region saw the most returned items? For what reasons?
+
+```sql
+WITH ReturnCounts AS (
+  SELECT rg.region, r.reason_returned, COUNT(*) AS count_per_reason_returned
+  FROM orders AS o
+  JOIN Returns AS r ON o.order_id = r.order_id
+  JOIN Regions AS rg ON o.region_id = rg.region_id
+  GROUP BY rg.region, r.reason_returned
+)
+
+SELECT region, reason_returned, count_per_reason_returned
+FROM ReturnCounts
+WHERE (region, count_per_reason_returned) IN (
+  SELECT region, MAX(count_per_reason_returned)
+  FROM ReturnCounts
+  GROUP BY region
+)
+ORDER BY count_per_reason_returned DESC;
+```
+
+### Answer:
+- "Americas": "Not Given" - 8004
+- "EMEA": "Not Given" - 7034
+- "APAC": "Not Given" - 4398
+
+**Knowledge/Skills Gained:**
+- Common Table Expressions (CTEs)
+- Subqueries in SELECT and WHERE clauses
+
+## 11. What product was returned most often?
+
+```sql
+SELECT rg.region, r.reason_returned, COUNT(*) AS count_per_reason_returned
+FROM orders AS o
+JOIN Returns AS r ON o.order_id = r.order_id
+JOIN Regions AS rg ON o.region_id = rg.region_id
+GROUP BY rg.region, r.reason_returned
+HAVING COUNT(*) = (
+  SELECT MAX(return_count)
+  FROM (
+    SELECT rg.region, COUNT(*) AS return_count
+    FROM orders AS o
+    JOIN Returns AS r ON o.order_id = r.order_id
+    JOIN Regions AS rg ON o.region_id = rg.region_id
+    GROUP BY rg.region
+  ) AS MaxReturnCount
+)
+ORDER BY count_per_reason_returned DESC;
+```
+
+### Answer:
+- "Staples" - 281
+
+**Knowledge/Skills Gained:**
+- More advanced JOINs and HAVING clause
+
+## 12. Which of our “top vendors” saw the most returns?
+
+```sql
+SELECT vendor, COUNT(*) AS return_counts
+FROM (
+  SELECT
+    CASE 
+      WHEN product_name ILIKE '%3M%' THEN '3M'
+      WHEN product_name ILIKE '%Apple%' THEN 'Apple'
+      -- ... (similar WHEN clauses for other vendors)
+    END AS vendor
+  FROM products
+  JOIN orders ON orders.product_id = products.product_id
+  JOIN returns ON orders.order_id = returns.order_id
+) AS categorized_products
+GROUP BY vendor
+HAVING vendor IS NOT NULL
+ORDER BY return_counts DESC;
+```
+
+### Answer:
+- "Avery" - 1896
+- "Xerox" - 1197
+- "Logitech" - 765
+- "Samsung" - 703
+- "Hewlett-Packard" - 601
+- "Apple" - 547
+- "Cisco" - 442
+- "Panasonic" - 311
+- "Epson" - 307
+- "3M" - 55
+
+**Knowledge/Skills Gained:**
+- Extensive use of CASE statements in JOINs
+- Handling multiple conditions in SQL
+
+## 13. Which product is most profitable with the consumer segment?
+
+```sql
+SELECT o.product_id, product_name, SUM(profit) AS total_profit
+FROM orders AS o
+JOIN products AS p ON o.product_id = p.product_id
+JOIN customers AS c ON o.customer_id = c.customer_id
+WHERE segment = 'Consumer'
+GROUP BY o.product_id, product_name
+ORDER BY total_profit DESC
+LIMIT 1;
+```
+
+### Answer:
+- "TEC-CO-10004722" - "Canon imageCLASS 2200 Advanced Copier" - $12,904.17
+
+**Knowledge/Skills Gained:**
+- Aggregating and summing data
+- Using GROUP BY and ORDER BY in conjunction
+
+
+# SQL Notes - Section 4
+
+## 14. Use subqueries to answer the following questions:
+
+### 14.1 Has our organization sales grown over the years?
+
+```sql
+SELECT DATE_PART('year', order_month) AS order_year, AVG(monthly_sales) AS monthly_average_sales_per_year
+FROM (
+    SELECT DATE_TRUNC('month', order_date) AS order_month, SUM(sales) AS monthly_sales
+    FROM orders
+    GROUP BY order_month
+) AS fahmi
+GROUP BY order_year;
+```
+
+#### Answer:
+```
+2015 - 2114.06
+2016 - 789018.3975
+2017 - 2535652.5183
+2018 - 5688918.4175
+2019 - 10904337.575
+2020 - 4447514.74
+```
+
+**Knowledge/Skills Gained:**
+- Date functions in PostgreSQL
+- Nested subqueries and aggregations
+
+## 15. On average, what percent of salespeople make a sale each month?
+
+```sql
+WITH MonthlySalesCounts AS (
+    SELECT
+        DATE_TRUNC('month', order_date) AS order_month,
+        COUNT(DISTINCT salesperson) AS salespeople_count
+    FROM regions AS r
+    INNER JOIN orders AS o ON r.region_id = o.region_id
+    GROUP BY order_month
+)
+SELECT AVG(salespeople_count * 100.0 / total_salespeople) AS average_percent_salespeople_per_month
+FROM MonthlySalesCounts
+CROSS JOIN (
+    SELECT COUNT(DISTINCT salesperson) AS total_salespeople
+    FROM regions AS r
+    INNER JOIN orders AS o ON r.region_id = o.region_id
+) AS TotalSalespeople;
+```
+
+#### Answer:
+```
+99.2
+```
+
+**Knowledge/Skills Gained:**
+- Common Table Expressions (CTEs)
+- Percentage calculations in SQL
+
+## 16. What percent of all sales in the United States did returns make up in 2020?
+
+```sql
+SELECT (
+    SELECT SUM(o.sales) AS return_total_sales
+    FROM orders o
+    JOIN regions g ON o.region_id = g.region_id
+    WHERE o.order_id IN (
+        SELECT order_id
+        FROM public.returns
+    )
+    AND g.country = 'United States'
+    AND DATE_PART('year', o.order_date) = 2020
+) / SUM(sales) * 100 AS return_percent_sale_United_States
+FROM orders o
+JOIN regions g ON o.region_id = g.region_id
+WHERE DATE_PART('year', order_date) = 2020
+AND g.country = 'United States';
+```
+
+#### Answer:
+```
+8.32
+```
+
+**Knowledge/Skills Gained:**
+- Subqueries in SELECT and WHERE clauses
+- Advanced percentage calculations in SQL
+```
+
