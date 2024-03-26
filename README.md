@@ -1,4 +1,4 @@
-# SQL-Footnote
+# SQL Practices Notes
 
 # Superstore Dataset Analysis
 
