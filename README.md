@@ -358,9 +358,8 @@ AND g.country = 'United States';
 ```
 8.32
 ```
-
 **Knowledge/Skills Gained:**
 - Subqueries in SELECT and WHERE clauses
 - Advanced percentage calculations in SQL
-```
+
 
